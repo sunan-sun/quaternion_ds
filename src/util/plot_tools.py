@@ -14,6 +14,26 @@ import random
 # mpl.rc('font', **font)
 
 
+def plot_traj(q_train, q_test=None):
+    """ q_list: list of quaternion objects array"""
+
+    fig = plt.figure(figsize=(12, 10))
+    ax = fig.add_subplot()
+    colors = ['lightsalmon', 'red', 'peru', 'maroon']
+    for l in range(len(q_train)):
+        q_l = np.array([q.as_quat() for q in q_train[l]])
+        for k in range(4):
+            ax.plot(q_l[:, k], linewidth=1, color=colors[k], alpha=0.4)
+
+    if q_test is not None:
+        q_l = np.array([q.as_quat() for q in q_test])
+        for k in range(4):
+            ax.plot(q_l[:, k], linewidth=3, color=colors[k], alpha=1)
+
+
+
+
+
 
 def plot_omega(omega_test):
 

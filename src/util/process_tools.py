@@ -163,7 +163,7 @@ def pre_process(p_raw, q_raw, t_raw, opt="savgol"):
     p_in, p_att             = _shift_pos(p_raw)
     q_in, q_att             = _shift_ori(q_raw)
 
-    # q_in                    = _smooth_ori(q_in, q_att, opt)  # needed or not?
+    q_in                    = _smooth_ori(q_in, q_att, opt)  # needed or not?
 
     # p_in, q_in, t_in        = _filter(p_in, q_in, t_raw)  # needed or not?
 
@@ -229,22 +229,26 @@ def extract_state(p_list, q_list):
 
 
 def rollout_list(p_in, q_in, p_out, q_out):
-    """ Roll out the nested list into a single list of M entries """
+    """ Roll out the nested lists into single arrays/lists.
 
+    - p_in, p_out: lists of (M_l, D) numpy arrays -> returned as a single (sum M_l, D) ndarray
+    - q_in, q_out: lists of sequences (e.g. list of scipy Rotation) -> returned as a single list
+    """
     L = len(q_in)
 
+    if not (len(p_in) == len(q_in) == len(p_out) == len(q_out)):
+        raise ValueError("All input lists (p_in, q_in, p_out, q_out) must have the same length")
+
+    # concatenate position arrays (safe for single or zero trajectories)
+    p_in_rollout = np.vstack(p_in) if len(p_in) > 0 else np.empty((0, 0))
+    p_out_rollout = np.vstack(p_out) if len(p_out) > 0 else np.empty((0, 0))
+
+    # flatten orientation lists into a single list (preserve Rotation objects)
+    q_in_rollout = []
+    q_out_rollout = []
     for l in range(L):
-        if l == 0:
-            p_in_rollout = p_in[l]
-            q_in_rollout = q_in[l]
-            p_out_rollout = p_out[l]
-            q_out_rollout = q_out[l]
-        else:
-            p_in_rollout = np.vstack((p_in_rollout, p_in[l]))
-            q_in_rollout += q_in[l]
-            p_out_rollout = np.vstack((p_out_rollout, p_out[l]))
-            q_out_rollout += q_out[l]
-            
+        q_in_rollout.extend(list(q_in[l]))
+        q_out_rollout.extend(list(q_out[l]))
 
     return p_in_rollout, q_in_rollout, p_out_rollout, q_out_rollout
 

@@ -67,7 +67,7 @@ def _get_sequence(seq_file):
 
 
 
-def load_clfd_dataset(task_id=1, num_traj=1, sub_sample=3):
+def load_clfd_dataset(task_id=1, num_traj=1, sub_sample=3, duration=10.0):
     """
     Load data from clfd dataset
 
@@ -88,7 +88,7 @@ def load_clfd_dataset(task_id=1, num_traj=1, sub_sample=3):
     """
 
     L = num_traj
-    T = 10.0            # pick a time duration 
+    # T = 10.0            # pick a time duration 
 
     file_path           = os.path.dirname(os.path.realpath(__file__))  
     dir_path            = os.path.dirname(file_path)
@@ -115,10 +115,10 @@ def load_clfd_dataset(task_id=1, num_traj=1, sub_sample=3):
 
         p_raw.append(data[l, :, :3])
         q_raw.append([R.from_quat(q) for q in data_ori.tolist()])
-        t_raw.append(np.linspace(0, T, M, endpoint=False))   # hand engineer an equal-length time stamp
+        t_raw.append(np.linspace(0, duration, M, endpoint=False))   # hand engineer an equal-length time stamp
 
-
-    return p_raw, q_raw, t_raw
+    dt = t_raw[0][1] - t_raw[0][0]
+    return p_raw, q_raw, t_raw, dt
 
 
 
