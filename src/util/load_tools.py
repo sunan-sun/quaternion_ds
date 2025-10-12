@@ -36,13 +36,14 @@ def _process_bag(path):
 
         pos_traj  = pos_traj[:, first_non_zero_index:last_non_zero_index]
         quat_traj = quat_traj[:, first_non_zero_index:last_non_zero_index]
-        time_traj = time_traj[:, first_non_zero_index:last_non_zero_index] * 2
+        time_traj = time_traj[:, first_non_zero_index:last_non_zero_index]
         
         p_raw.append(pos_traj.T)
         q_raw.append([R.from_quat(quat_traj[:, i]) for i in range(quat_traj.shape[1]) ])
         t_raw.append(time_traj.reshape(time_traj.shape[1]))
 
-    return p_raw, q_raw, t_raw
+    dt = (t_raw[0][-1] - t_raw[0][0])/len(t_raw[0])
+    return p_raw, q_raw, t_raw, dt
 
 
 
@@ -137,7 +138,7 @@ def load_demo_dataset():
 
 
 
-def load_npy():
+def load_npy(duration):
 
     traj = np.load("dataset/UMI/traj1.npy")
 
@@ -145,12 +146,9 @@ def load_npy():
 
     p_raw = [traj[i, :3, -1] for i in range(traj.shape[0])]
 
-    """provide dt"""
-    # dt = 0.07
-
     """or provide T"""
-    T = 5
-    dt = T/traj.shape[0]
+
+    dt = duration/traj.shape[0]
 
     t_raw = [dt*i for i in range(traj.shape[0])]
 

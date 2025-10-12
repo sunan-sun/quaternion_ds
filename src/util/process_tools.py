@@ -236,12 +236,9 @@ def rollout_list(p_in, q_in, p_out, q_out):
     """
     L = len(q_in)
 
-    if not (len(p_in) == len(q_in) == len(p_out) == len(q_out)):
-        raise ValueError("All input lists (p_in, q_in, p_out, q_out) must have the same length")
-
-    # concatenate position arrays (safe for single or zero trajectories)
-    p_in_rollout = np.vstack(p_in) if len(p_in) > 0 else np.empty((0, 0))
-    p_out_rollout = np.vstack(p_out) if len(p_out) > 0 else np.empty((0, 0))
+    # concatenate position arrays 
+    p_in_rollout = np.vstack(p_in) 
+    p_out_rollout = np.vstack(p_out)
 
     # flatten orientation lists into a single list (preserve Rotation objects)
     q_in_rollout = []

@@ -57,8 +57,8 @@ class quat_class:
         self.N = 4
 
         # simulation parameters
-        self.tol = 10E-3
-        self.max_iter = 5000
+        self.tol = 10E-2
+        # self.max_iter = 5000
 
         # define output path
         file_path           = os.path.dirname(os.path.realpath(__file__))  
@@ -117,27 +117,33 @@ class quat_class:
 
 
 
-    def sim(self, q_init, step_size):
+    def sim(self, q_init, step_size, duration):
         q_test = [q_init]
         gamma_test = []
         omega_test = []
-
+        
+        # while np.linalg.norm((q_test[-1] * self.q_att.inv()).as_rotvec()) >= self.tol:
+            # if i > self.max_iter:
+            #     print("Exceed max iteration")
+            #     break
+        
         i = 0
-        while np.linalg.norm((q_test[-1] * self.q_att.inv()).as_rotvec()) >= self.tol:
-            if i > self.max_iter:
-                print("Exceed max iteration")
-                break
-            
+        max_iter = int(duration / step_size)
+        while i < max_iter:
             q_in  = q_test[i]
 
             q_next, gamma, omega = self._step(q_in, step_size)
 
-            q_test.append(q_next)        
+            q_test.append(q_next)
             gamma_test.append(gamma[:, 0])
             omega_test.append(omega)
 
             i += 1
-
+        if np.linalg.norm((q_test[-1] * self.q_att.inv()).as_rotvec()) <= self.tol:
+            print("Converged within max iteration")
+        else:
+            print("Did not converge within max iteration")
+        
         return  q_test, np.array(gamma_test), np.array(omega_test)
         
 
