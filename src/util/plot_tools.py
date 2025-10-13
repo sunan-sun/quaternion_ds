@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from matplotlib.ticker import FormatStrFormatter
 from scipy.spatial.transform import Rotation as R
-from .quat_tools import *
 import random
+
+from .quat_tools import *
 
 
 # font = {'family' : 'Times New Roman',
@@ -15,7 +16,7 @@ import random
 
 
 def plot_traj(q_train, q_test=None):
-    """ q_list: list of quaternion objects array"""
+    """ q_list: nested list of quaternion objects"""
 
     fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot()

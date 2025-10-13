@@ -4,5 +4,4 @@ matplotlib
 scikit-learn
 gmr
 cvxpy
-dtw-python
 mosek
