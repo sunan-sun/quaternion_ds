@@ -1,12 +1,24 @@
 import sys
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+from scipy.linalg import null_space
 
 
 """
 @note all operations below, of which the return is a vector, return 1-D array, 
       unless multiple inputs are given in vectorized operations
 """
+
+def map(att_vec, q):
+    """q is on tangent plane"""
+    att_basis = null_space(att_vec.as_quat().reshape(1, -1))
+    v, _, _, _ = np.linalg.lstsq(att_basis, q.T, rcond=None) #only works if second input is dimension by number of points
+    return v.T
+
+def inv_map(att_vec, v):
+    att_basis = null_space(att_vec.as_quat().reshape(1, -1))
+    q_tangent = att_basis @ v               
+    return q_tangent
 
 
 def quat_mean(q_list):

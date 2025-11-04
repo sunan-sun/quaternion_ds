@@ -6,13 +6,42 @@ from matplotlib.ticker import FormatStrFormatter
 from scipy.spatial.transform import Rotation as R
 import random
 
-from .quat_tools import *
+from . import quat_tools
 
 
 # font = {'family' : 'Times New Roman',
 #          'size'   : 18
 #          }
 # mpl.rc('font', **font)
+
+
+def plot_ds(q_train, q_test, q_att):
+    
+    q_train_att = quat_tools.riem_log(q_att, q_train)
+    q_test_att  = quat_tools.riem_log(q_att, q_test)
+
+    q_train_3d = quat_tools.map(q_att, q_train_att)
+    q_test_3d = quat_tools.map(q_att, q_test_att)
+
+    fig = plt.figure(figsize=(12, 10))
+    ax = fig.add_subplot(projection='3d')
+    ax.scatter(q_train_3d[:, 0], q_train_3d[:, 1], q_train_3d[:, 2], 'o', color='k', s=1, alpha=0.4, label="Demonstration")
+    ax.plot(q_test_3d[:, 0], q_test_3d[:, 1], q_test_3d[:, 2], color= 'b', linewidth=3)
+
+    ax.set_xlabel(r'$\xi_1$', fontsize=38, labelpad=20)
+    ax.set_ylabel(r'$\xi_2$', fontsize=38, labelpad=20)
+    ax.set_zlabel(r'$\xi_3$', fontsize=38, labelpad=20)
+    ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=3))
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=3))
+    ax.zaxis.set_major_locator(MaxNLocator(nbins=3))
+    ax.tick_params(axis='z', which='major', pad=15)
+    ax.axis('equal')
+    ax.view_init(elev=30, azim=-20)
+
+
 
 
 def plot_traj(q_train, q_test=None):
@@ -94,6 +123,8 @@ def plot_gmm(p_in, gmm):
         label_k =np.where(label == k)[0]
         p_in_k = p_in[label_k, :]
         loc = np.mean(p_in_k, axis=0)
+
+        ax.text(loc[0], loc[1], loc[2]+0.03, str(k+1), fontsize=20)
 
         r = gmm.gaussian_list[k]["mu"]
         for j, (axis, c) in enumerate(zip((ax.xaxis, ax.yaxis, ax.zaxis), colors)):

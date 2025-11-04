@@ -95,18 +95,12 @@ class quat_class:
 
     def elasticUpdate(self, new_q_in, new_q_out, gmm_struct_ori, att_ori_new):
         self.q_att = att_ori_new
-        Prior = gmm_struct_ori["Prior"]
-        Mu = gmm_struct_ori["Mu"]
-        Sigma = gmm_struct_ori["Sigma"]
 
-        gamma = self.gmm.elasticUpdate(new_q_in, Prior, Mu, Sigma)
+        gamma = self.gmm.elasticUpdate(new_q_in, gmm_struct_ori)
 
-        print(gamma)
+        # print(gamma)
         A_ori = optimize_tools.optimize_ori(new_q_in, new_q_out, self.q_att, gamma)
-        print("old_A_ori", self.A_ori)
-        print("new_A_ori", A_ori)
-        for k in range (self.K):
-            print("last norm", np.linalg.norm(A_ori[k]))
+
         q_in_dual   = [R.from_quat(-q.as_quat()) for q in new_q_in]
         q_out_dual  = [R.from_quat(-q.as_quat()) for q in new_q_out]
         q_att_dual =  R.from_quat(-self.q_att.as_quat())
@@ -195,7 +189,6 @@ class quat_class:
 
 
     def _logOut(self, write_json, *args): 
-        print(args)
 
         Prior = self.gmm.Prior
         Mu    = self.gmm.Mu
