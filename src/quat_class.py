@@ -98,17 +98,16 @@ class quat_class:
 
         gamma = self.gmm.elasticUpdate(new_q_in, gmm_struct_ori)
 
-        # print(gamma)
-        A_ori = optimize_tools.optimize_ori(new_q_in, new_q_out, self.q_att, gamma)
+        A_ori, success = optimize_tools.optimize_ori(new_q_in, new_q_out, self.q_att, gamma)
 
-        q_in_dual   = [R.from_quat(-q.as_quat()) for q in new_q_in]
-        q_out_dual  = [R.from_quat(-q.as_quat()) for q in new_q_out]
-        q_att_dual =  R.from_quat(-self.q_att.as_quat())
-        A_ori_dual = optimize_tools.optimize_ori(q_in_dual, q_out_dual, q_att_dual, gamma)
+        if success:
+            q_in_dual   = [R.from_quat(-q.as_quat()) for q in new_q_in]
+            q_out_dual  = [R.from_quat(-q.as_quat()) for q in new_q_out]
+            q_att_dual =  R.from_quat(-self.q_att.as_quat())
+            A_ori_dual, success = optimize_tools.optimize_ori(q_in_dual, q_out_dual, q_att_dual, gamma)
+            self.A_ori = np.concatenate((A_ori, A_ori_dual), axis=0)
 
-        self.A_ori = np.concatenate((A_ori, A_ori_dual), axis=0)
-
-
+        return success
 
 
     def sim(self, q_init, step_size, duration):

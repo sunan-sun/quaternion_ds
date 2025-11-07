@@ -38,13 +38,19 @@ def optimize_ori(q_in, q_out, q_att, postProb):
 
 
     problem = cp.Problem(cp.Minimize(objective), constraints)
-    problem.solve(solver=cp.MOSEK, verbose=False)
-
 
     A_res = np.zeros((K, N, N))
-    for k in range(K):
-        A_res[k, :, :] = A_vars[k].value
-        print("A_norm_ori", np.linalg.norm(A_res[k], 'fro'))
+    success = False
+    try:
+        problem.solve(solver=cp.MOSEK, verbose=False)
+        success = True
+    except:
+        print("Retrying orientation optimization")
+
+    if success:
+        for k in range(K):
+            A_res[k, :, :] = A_vars[k].value
+            print("A_norm_ori", np.linalg.norm(A_res[k], 'fro'))
 
 
-    return A_res
+    return A_res, success
