@@ -76,12 +76,12 @@ class quat_class:
 
 
     def _optimize(self):
-        A_ori = optimize_tools.optimize_ori(self.q_in, self.q_out, self.q_att, self.gamma)
+        A_ori, _ = optimize_tools.optimize_ori(self.q_in, self.q_out, self.q_att, self.gamma)
 
         q_in_dual   = [R.from_quat(-q.as_quat()) for q in self.q_in]
         q_out_dual  = [R.from_quat(-q.as_quat()) for q in self.q_out]
         q_att_dual =  R.from_quat(-self.q_att.as_quat())
-        A_ori_dual = optimize_tools.optimize_ori(q_in_dual, q_out_dual, q_att_dual, self.gamma)
+        A_ori_dual, _ = optimize_tools.optimize_ori(q_in_dual, q_out_dual, q_att_dual, self.gamma)
 
         self.A_ori = np.concatenate((A_ori, A_ori_dual), axis=0)
 
