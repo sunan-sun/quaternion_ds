@@ -185,6 +185,108 @@ class quat_class:
         return q_next, gamma, omega
             
     
+    def sim2(self, q_init, step_size, duration, gpr, modulation_matrix, map, inv_map):
+        q_test = [q_init]
+        gamma_test = []
+        omega_test = []
+        q_out_att_3d_list = []
+        y_mean_list = []
+        # while np.linalg.norm((q_test[-1] * self.q_att.inv()).as_rotvec()) >= self.tol:
+        #     if i > self.max_iter:
+        #         print("Exceed max iteration")
+        #         break
+        
+        i = 0
+        max_iter = int(duration / step_size)
+        while i < max_iter:
+            q_in  = q_test[i]
+
+            q_next, gamma, omega, q_out_att_3d, y_mean= self._step2(q_in, step_size, gpr, modulation_matrix, map, inv_map)
+
+            q_test.append(q_next)
+            gamma_test.append(gamma[:, 0])
+            omega_test.append(omega)
+            q_out_att_3d_list.append(q_out_att_3d)
+            y_mean_list.append(y_mean[0])
+
+            i += 1
+        if np.linalg.norm((q_test[-1] * self.q_att.inv()).as_rotvec()) <= self.tol:
+            print("Converged within max iteration")
+        else:
+            print("Did not converge within max iteration")
+        
+        return  q_test, np.array(gamma_test), np.array(omega_test), np.array(q_out_att_3d_list), np.array(y_mean_list)
+    
+
+
+    def _step2(self, q_in, step_size, gpr, modulation_matrix, map, inv_map, force_first_half=True):
+        """ Used for orientation modulation """
+
+        # read parameters
+        A_ori = self.A_ori  # (2K, N, N)
+        q_att = self.q_att
+        K     = self.K
+        gmm   = self.gmm
+
+
+        # compute gamma
+        gamma = gmm.logProb(q_in)   # (2K, 1)
+        if np.argmax(gamma) >= K:
+            print("flipping new_ori")
+            q_in = R.from_quat(-q_in.as_quat())
+
+        if gpr is not None:
+            X = quat_tools.riem_log(q_att, q_in)
+            y_mean, y_std = gpr.predict(X, return_std=True)
+            M = modulation_matrix(y_mean[0, 1:4], y_mean[0, 0])
+        else:
+            M = np.eye(3)
+            y_mean = np.zeros((1,3))
+
+        # print(M)
+
+
+        # first cover 
+        q_out_att = np.zeros((4, 1))
+        q_diff  = quat_tools.riem_log(q_att, q_in)
+        for k in range(K):
+            q_out_att += gamma[k, 0] * A_ori[k] @ q_diff.T
+        # print("Original intermediate output in 4D: ", q_out_att[:, 0])
+        q_out_att_3d = map(q_att, q_out_att.T[0])
+        # print("Original intermediate output in 3D: ", q_out_att_3d)
+        q_out_att_3d = M @ q_out_att_3d
+        # print("Modified intermediate output in 3D: ", q_out_att_3d)
+        q_out_att = inv_map(q_att, q_out_att_3d)
+        # print("Modified intermediate output in 4D: ", q_out_att)
+
+        q_out_body = quat_tools.parallel_transport(q_att, q_in, q_out_att.T)
+        q_out_q    = quat_tools.riem_exp(q_in, q_out_body) 
+        q_out      = R.from_quat(q_out_q.reshape(4,))
+        omega      = compute_ang_vel(q_in, q_out, self.dt)  
+
+
+        # dual cover
+        q_att_dual = R.from_quat(-q_att.as_quat())
+        q_out_att_dual = np.zeros((4, 1))
+        q_diff_dual  = quat_tools.riem_log(q_att_dual, q_in)
+        for k in range(K):
+            q_out_att_dual += gamma[self.K+k, 0] * A_ori[self.K+k] @ q_diff_dual.T
+        q_out_body_dual = quat_tools.parallel_transport(q_att_dual, q_in, q_out_att_dual.T)
+        q_out_q_dual    = quat_tools.riem_exp(q_in, q_out_body_dual) 
+        q_out_dual      = R.from_quat(q_out_q_dual.reshape(4,))
+        omega           += compute_ang_vel(q_in, q_out_dual, self.dt)  
+        
+        
+        # propagate forward
+        q_next     = R.from_rotvec(omega * step_size) * q_in  #compose in world frame
+        # q_next     = q_in * R.from_rotvec(w_out * step_size)   #compose in body frame
+
+
+        # if np.argmax(gamma) >= K:
+        #     q_next = R.from_quat(-q_next.as_quat())
+
+        return q_next, gamma, omega, q_out_att_3d, y_mean
+    
 
 
     def _logOut(self, write_json, *args): 

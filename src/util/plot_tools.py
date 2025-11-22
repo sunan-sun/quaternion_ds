@@ -44,7 +44,7 @@ def plot_ds(q_train, q_test, q_att):
 
 
 
-def plot_traj(q_train, q_test=None):
+def plot_traj(q_train, q_test=None, q_mod=None, q_mod_idx=None):
     """ q_list: nested list of quaternion objects"""
 
     fig = plt.figure(figsize=(12, 10))
@@ -59,6 +59,12 @@ def plot_traj(q_train, q_test=None):
         q_l = np.array([q.as_quat() for q in q_test])
         for k in range(4):
             ax.plot(q_l[:, k], linewidth=3, color=colors[k], alpha=1)
+
+    if q_mod is not None and q_mod_idx is not None:
+        q_mod = q_mod.as_quat()
+        for k in range(4):
+            ax.scatter(q_mod_idx, q_mod[k], color = 'red')
+        
 
 
 
