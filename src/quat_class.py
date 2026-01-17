@@ -1,6 +1,7 @@
 import os, sys, json
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+from scipy.linalg import null_space
 
 from .util import optimize_tools, quat_tools
 from .gmm_class import gmm_class
@@ -24,6 +25,22 @@ def compute_ang_vel(q_k, q_kp1, dt=0.01):
     
     return w
 
+
+def map(att_vec, q):
+    #4d to 3d
+    att_basis = null_space(att_vec.as_quat().reshape(1, -1))
+    v, _, _, _ = np.linalg.lstsq(att_basis, q, rcond=None)
+    return v
+
+def inv_map(att_vec, v):
+    #3d to 4d
+    att_basis = null_space(att_vec.as_quat().reshape(1, -1))
+    q_tangent = att_basis @ v               
+    return q_tangent
+
+def modulation_matrix(mu_phi, kappa):
+    M = (1+kappa) * R.from_rotvec(mu_phi).as_matrix() 
+    return M
 
 
 class quat_class:
@@ -136,7 +153,8 @@ class quat_class:
             print("Converged within max iteration")
         else:
             print("Did not converge within max iteration")
-        
+            print("Ori norm: ", np.linalg.norm((q_test[-1] * self.q_att.inv()).as_rotvec()))
+
         return  q_test, np.array(gamma_test), np.array(omega_test)
         
 
@@ -152,7 +170,15 @@ class quat_class:
 
 
         # compute gamma
-        gamma = gmm.logProb(q_in)   # (2K, 1)
+        if gmm is None:
+            gamma = np.zeros((2*K, 1))
+            dot_product = np.dot(q_in.as_quat(), q_att.as_quat())
+            if dot_product >= 0:
+                gamma[:K, 0] = 1.0 / K
+            else:
+                gamma[K:, 0] = 1.0 / K
+        else:
+            gamma = gmm.logProb(q_in)   # (2K, 1)
 
 
         # first cover 
@@ -219,7 +245,7 @@ class quat_class:
     
 
 
-    def _step2(self, q_in, step_size, gpr, modulation_matrix, map, inv_map, force_first_half=True):
+    def _step2(self, q_in, step_size, gpr):
         """ Used for orientation modulation """
 
         # read parameters
@@ -230,20 +256,29 @@ class quat_class:
 
 
         # compute gamma
-        gamma = gmm.logProb(q_in)   # (2K, 1)
+        if gmm is None:
+            gamma = np.zeros((2*K, 1))
+            dot_product = np.dot(q_in.as_quat(), q_att.as_quat())
+            if dot_product >= 0:
+                gamma[:K, 0] = 1.0 / K
+            else:
+                gamma[K:, 0] = 1.0 / K
+        else:
+            gamma = gmm.logProb(q_in)   # (2K, 1)
         if np.argmax(gamma) >= K:
             print("flipping new_ori")
             q_in = R.from_quat(-q_in.as_quat())
 
-        if gpr is not None:
+        if gpr is None:
+            M = np.eye(3)
+            y_mean = np.zeros((1,3))
+        elif gpr=='test':
+            y_mean = np.ones((1,4))
+            M = modulation_matrix(y_mean[0, 1:4], y_mean[0, 0])
+        else:
             X = quat_tools.riem_log(q_att, q_in)
             y_mean, y_std = gpr.predict(X, return_std=True)
             M = modulation_matrix(y_mean[0, 1:4], y_mean[0, 0])
-        else:
-            M = np.eye(3)
-            y_mean = np.zeros((1,3))
-
-        # print(M)
 
 
         # first cover 
@@ -266,15 +301,15 @@ class quat_class:
 
 
         # dual cover
-        q_att_dual = R.from_quat(-q_att.as_quat())
-        q_out_att_dual = np.zeros((4, 1))
-        q_diff_dual  = quat_tools.riem_log(q_att_dual, q_in)
-        for k in range(K):
-            q_out_att_dual += gamma[self.K+k, 0] * A_ori[self.K+k] @ q_diff_dual.T
-        q_out_body_dual = quat_tools.parallel_transport(q_att_dual, q_in, q_out_att_dual.T)
-        q_out_q_dual    = quat_tools.riem_exp(q_in, q_out_body_dual) 
-        q_out_dual      = R.from_quat(q_out_q_dual.reshape(4,))
-        omega           += compute_ang_vel(q_in, q_out_dual, self.dt)  
+        # q_att_dual = R.from_quat(-q_att.as_quat())
+        # q_out_att_dual = np.zeros((4, 1))
+        # q_diff_dual  = quat_tools.riem_log(q_att_dual, q_in)
+        # for k in range(K):
+        #     q_out_att_dual += gamma[self.K+k, 0] * A_ori[self.K+k] @ q_diff_dual.T
+        # q_out_body_dual = quat_tools.parallel_transport(q_att_dual, q_in, q_out_att_dual.T)
+        # q_out_q_dual    = quat_tools.riem_exp(q_in, q_out_body_dual) 
+        # q_out_dual      = R.from_quat(q_out_q_dual.reshape(4,))
+        # omega           += compute_ang_vel(q_in, q_out_dual, self.dt)  
         
         
         # propagate forward
@@ -285,7 +320,7 @@ class quat_class:
         # if np.argmax(gamma) >= K:
         #     q_next = R.from_quat(-q_next.as_quat())
 
-        return q_next, gamma, omega, q_out_att_3d, y_mean
+        return q_next, gamma, omega, y_mean
     
 
 
@@ -326,3 +361,29 @@ class quat_class:
                 _write_json(json_output, os.path.join(args[0], '1.json'))
 
         return json_output
+
+
+    @classmethod
+    def single_ds(cls, q_att):
+        """ Returns an instance of quat_class with all attributes initialized to None """
+        # Create the instance without calling __init__
+        instance = cls.__new__(cls)
+        
+        # Manually initialize the expected attributes
+        instance.q_in = None
+        instance.q_out = None
+        instance.K_init = None
+        instance.M = None
+        instance.output_path = None
+        instance.gamma = None
+        instance.gmm = None
+
+
+        instance.N = 4  # You might keep constants like N=4
+        instance.q_att = q_att
+        instance.tol = 10E-2
+        instance.K = 1
+        instance.dt = 0.01 # modify to control the angular velocity
+        instance.A_ori =  np.tile(-0.1 * np.eye(instance.N), (2 * instance.K, 1, 1)) # (2K, N, N)
+        
+        return instance
