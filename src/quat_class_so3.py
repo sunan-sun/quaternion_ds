@@ -14,10 +14,21 @@ def _write_json(data, path):
         json.dump(data, json_file, indent=4)
 
 
-def _first_cover_gamma(gamma, K):
+def _fold_cover_gamma(gamma, K):
+    """Fold the legacy GMM's two-cover responsibilities onto a single cover.
+
+    The legacy quaternion GMM fits 2K clusters: cluster k and cluster k+K are the
+    SAME orientation seen as the antipodal quaternions q and -q. Truncating to the
+    first K (the old `_first_cover_gamma`) zeroed gamma whenever the input
+    quaternion landed on the second cover -> the DS returned omega = 0 (the
+    double-cover bug). Summing each antipodal pair makes the responsibilities
+    hemisphere-invariant: gamma[k] += gamma[k+K].
+    """
     gamma = np.asarray(gamma, dtype=float)
     if gamma.ndim == 1:
         gamma = gamma.reshape(-1, 1)
+    if gamma.shape[0] >= 2 * K:
+        return gamma[:K, :] + gamma[K:2 * K, :]
     return gamma[:K, :]
 
 
@@ -98,7 +109,7 @@ class quat_class_so3:
         gmm = gmm_class(self.q_in, self.q_att, self.K_init)
         gamma = gmm.fit()
         self.K = gmm.K
-        self.gamma = _first_cover_gamma(gamma, self.K)
+        self.gamma = _fold_cover_gamma(gamma, self.K)
         self.gmm = gmm
 
     def _optimize(self):
@@ -167,7 +178,7 @@ class quat_class_so3:
     def _predict_gamma(self, q_in):
         if hasattr(self.gmm, "predict_proba"):
             return self.gmm.predict_proba(rotations_to_wxyz(q_in)).T
-        return _first_cover_gamma(self.gmm.logProb(q_in), self.K)
+        return _fold_cover_gamma(self.gmm.logProb(q_in), self.K)
 
     def _logOut(self, write_json, *args):
         if hasattr(self.gmm, "weights_"):
